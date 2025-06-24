@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+:root {
+  --bg-gradient: linear-gradient(132deg, #000000, #9ff39f, #9494f3, #f795c6, #f89898, #ffffff);
+  --gradient-size: 400% 400%;
+  --font-main: 'Open Sans', sans-serif;
+}
+
+/* Animate gradient */
+@keyframes BackgroundGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Fullscreen animated background layer */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-gradient);
+  background-size: var(--gradient-size);
+  animation: BackgroundGradient 15s ease infinite;
+}
+
+/* Optional fallback for dark/light themes */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  font-family: var(--font-main), Arial, sans-serif;
+  color: var(--foreground, #000);
+  margin: 0;
+  padding: 0;
+}
