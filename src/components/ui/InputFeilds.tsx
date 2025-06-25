@@ -2,19 +2,26 @@
 import { chainsToTSender, tsenderAbi, erc20Abi } from "@/constants";
 import { useState, useMemo } from "react";
 import CalculateTotal from "@/utils/CalculateTotal";
-import {readContract } from "@wagmi/core"
-import { useChainId, useConfig, useAccount} from "wagmi";
-import { config } from "process";
+import {readContract, waitForTransactionReceipt } from "@wagmi/core"
+import { useChainId, useConfig, useAccount, useWriteContract} from "wagmi";
+import { Config } from "@wagmi/core";
+
+
+
+
 export default function TTokenSender() {
   const [tokenAddress, setTokenAddress] = useState("");
   const [recipients, setRecipients] = useState("");
   const [amounts, setAmounts] = useState("");
   const chainId = useChainId()
+
+
   const config = useConfig()
   const userAdress = useAccount()
 
   const total: number = useMemo(() => CalculateTotal(amounts), [amounts])
   console.log(total)
+  const {data: hash, isPending, writeContractAsync } = useWriteContract()
 
 
   async function getApprovedAmount(tsenderAdress: string | null): Promise<number> {
@@ -36,12 +43,59 @@ export default function TTokenSender() {
 
 
 
-  async function HandleSubmit(){
+  async function handleSubmit(){
     const tsenderAdress= chainsToTSender[chainId]["tsender"]
     console.log(tsenderAdress, chainId)
     const approvedAmmount = await getApprovedAmount(tsenderAdress)
     console.log(approvedAmmount)
 
+
+    if(approvedAmmount < total){
+      const approvedHash = await writeContractAsync({
+        abi: erc20Abi,
+        address: tokenAddress as `0x${string}`,
+        functionName: "approve",
+        args: [tsenderAdress as `0x${string}`, BigInt(total)]
+
+      })
+      console.log(approvedHash)
+
+      const approvalReceipt = await waitForTransactionReceipt(config, {
+        hash : approvedHash,
+        confirmations: 1,
+          
+      
+      })
+      console.log("transaction approved", approvalReceipt)
+
+        await writeContractAsync({
+        abi: tsenderAbi,
+        address: tsenderAdress as `0x${string}`,
+        functionName: "airdropERC20",
+        args: [
+          tokenAddress as `0x${string}`,
+          recipients.split(/[\n,]+/).map(str => str.trim()).filter(str => str !== ''),
+          amounts.split(/[\n,]+/).map(str => BigInt(str.trim())),
+          false,
+        ]
+    })
+      console.log("transaction sent", hash)
+    }
+    else{
+      await writeContractAsync({
+        abi: tsenderAbi,
+        address: tsenderAdress as `0x${string}`,
+        functionName: "airdropERC20",
+        args: [
+          tokenAddress as `0x${string}`,
+          recipients.split(/[\n,]+/).map(str => str.trim()).filter(str => str !== ''),
+          amounts.split(/[\n,]+/).map(str => BigInt(str.trim())),
+          false
+        ]
+    }
+  )
+
+}
 }
 
 
@@ -91,18 +145,21 @@ export default function TTokenSender() {
             placeholder="100, 200, 300..."
           />
         </div>
-
         <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg text-sm">
           <div className="text-gray-600 dark:text-gray-400 font-medium mb-2">Transaction Details</div>
-          <div className="text-gray-700 dark:text-gray-300">Token Name: <span className="font-semibold">-</span></div>
-          <div className="text-gray-700 dark:text-gray-300">Amount (wei): <span className="font-semibold">0</span></div>
-          <div className="text-gray-700 dark:text-gray-300">Amount (tokens): <span className="font-semibold">0.00</span></div>
+          <div className="text-gray-700 dark:text-gray-300">Token Name: {} <span className="font-semibold">-</span></div>
+          <div className="text-gray-700 dark:text-gray-300">Amount (wei): {amounts} <span className="font-semibold"></span></div>
+          <div className="text-gray-700 dark:text-gray-300">Amount (tokens): {weitoToken(amounts)}<span className="font-semibold"></span></div>
         </div>
 
-        <button className="w-full py-2 px-4 rounded-lg bg-blue-400 hover:bg-blue-800 text-white text-sm font-semibold transition" onClick={HandleSubmit}>
+        <button className="w-full py-2 px-4 rounded-lg bg-blue-400 hover:bg-blue-800 text-white text-sm font-semibold transition" onClick={handleSubmit}>
           Send Tokens
         </button>
       </div>
     </div>
   );
+}
+function weitoToken(wei: string): string {
+  return (parseFloat(wei) / 1e18).toFixed(2);
+ 
 }
